@@ -1,0 +1,12 @@
+{
+  "author": "Jakob Borg <jakob@nym.se> (http://nym.se/)",
+  "name": "power-fetcher",
+  "description": "Fetch some environmental data",
+  "version": "1.0.0",
+  "dependencies": {
+    "iso8601": "~1.1.1"
+  },
+  "engines": {
+    "node": "*"
+  }
+}

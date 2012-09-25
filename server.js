@@ -1,68 +1,66 @@
-var snmp = require('snmp-native');
 var iso8601 = require('iso8601');
 var dgram = require("dgram");
+var http = require('http');
 var udp = dgram.createSocket("udp4");
 
-var host = '172.16.32.64';
-var community = 'public';
-var impulsesOid = [1, 3, 6, 1, 4, 1, 31440, 10, 7, 1, 1, 1];
-var tempOid = [1, 3, 6, 1, 4, 1, 31440, 10, 5, 1, 1, 0];
-var session = new snmp.Session({ host: host, community: community });
+var envUrl = 'http://172.16.32.64/details.xml';
+var cubeSvr = '127.0.0.1';
 
-var options = {
-    host: '172.16.32.13',
-    port: 1080,
-    path: '/1.0/event/put',
-    method: 'POST'
-};
+function get(cb) {
+    var req = http.get(envUrl, function (res) {
+        var data = '';
+        res.on('data', function (chunk) { data += chunk; });
+        res.on('end', function () { cb(data); });
+        res.on('error', function () { });
+    });
 
-function wait(ms) {
+    req.on('error', function () { });
+}
+
+function next(ms) {
     var now = Date.now();
-    var next = (Math.floor(now / ms) + 1) * ms;
+    var next = Math.ceil(now / ms) * ms;
     return next - now;
 }
 
 function send(result) {
     var buffer = new Buffer(JSON.stringify(result));
-    udp.send(buffer, 0, buffer.length, 1180, '127.0.0.1');
+    udp.send(buffer, 0, buffer.length, 1180, cubeSvr);
     console.log(result);
 }
 
 var prevCounter;
-var results = [];
 function poll() {
-    session.get({ oid: impulsesOid }, function (err, varbinds) {
-        if (!err) {
-            var counter = varbinds[0].value;
+    get(function (data) {
+        var stamp = new Date();
+        var result = { type: 'reading', time: stamp, data: { } };
+
+        var m = data.match(/<Counter_A>([0-9.]+)/);
+        if (m) {
+            var counter = parseInt(m[1], 10);
             if (!prevCounter) {
                 prevCounter = counter;
             } else {
                 if (counter !== prevCounter) {
-                    var stamp = iso8601.fromDate(new Date(varbinds[0].receiveStamp));
-                    var result = { type: 'reading', time: stamp, data: { impulses: counter - prevCounter } };
-                    send(result);
+                    result.data.impulses = counter - prevCounter;
                     prevCounter = counter;
                 }
             }
         }
 
-        setTimeout(poll, wait(10000));
-    });
-}
+        var m = data.match(/<PrimaryValue>([0-9.]+) Deg C/);
+        if (m) {
+            var temp = parseFloat(m[1]).toFixed(1);
+            result.data.temperature = +temp;
+        }
 
-function pollTemperature() {
-    session.get({ oid: tempOid }, function (err, varbinds) {
-        if (!err) {
-            var temp = (+varbinds[0].value).toFixed(1);
-            var stamp = iso8601.fromDate(new Date(varbinds[0].receiveStamp));
-            var result = { type: 'reading', time: stamp, data: { temperature: +temp } };
+        if (result.data) {
             send(result);
         }
 
-        setTimeout(pollTemperature, wait(60000));
+        setTimeout(poll, next(60000));
     });
 }
 
 poll();
-pollTemperature();
 
