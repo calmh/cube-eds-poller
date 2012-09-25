@@ -20,7 +20,11 @@ function get(cb) {
 function next(ms) {
     var now = Date.now();
     var next = Math.ceil(now / ms) * ms;
-    return next - now;
+    var wait = next - now - 500;
+    if (wait < 0.25 * ms) {
+        wait += ms;
+    }
+    return wait;
 }
 
 function send(result) {
@@ -31,8 +35,8 @@ function send(result) {
 
 var prevCounter;
 function poll() {
+    var stamp = new Date();
     get(function (data) {
-        var stamp = new Date();
         var result = { type: 'reading', time: stamp, data: { } };
 
         var m = data.match(/<Counter_A>([0-9.]+)/);
