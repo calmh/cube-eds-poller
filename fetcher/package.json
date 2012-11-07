@@ -1,7 +1,7 @@
 {
   "author": "Jakob Borg <jakob@nym.se> (http://nym.se/)",
-  "name": "power-fetcher",
-  "description": "Fetch some environmental data",
+  "name": "eds-cube-poller",
+  "description": "Fetch environmental data from an EDS 1-Wire device and inject it into Cube",
   "version": "1.0.0",
   "dependencies": {
     "iso8601": "~1.1.1"
