@@ -7,14 +7,14 @@ Extract temperature, power consumption or whatever other data from an EDS
 Installation
 ------------
 
-    npm install -g eds-poller
+    npm install -g cube-eds-poller
 
 Configuration
 -------------
 
 This assumes a node installation in `/opt/local`. Adjust accordingly.
 
-    cp /opt/local/lib/node_modules/eds-poller/config.json /etc/eds-poller.json
+    cp /opt/local/lib/node_modules/cube-eds-poller/config.json /etc/eds-poller.json
     vi /etc/eds-poller.json
 
 Running
