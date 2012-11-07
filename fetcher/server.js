@@ -1,8 +1,12 @@
-var iso8601 = require('iso8601');
-var dgram = require("dgram");
+var dgram = require('dgram');
+var fs = require('fs');
 var http = require('http');
-var udp = dgram.createSocket("udp4");
+var iso8601 = require('iso8601');
+var path = require('path');
 
+var udp = dgram.createSocket('udp4');
+
+var stateFile = path.normalize(path.join(process.env.HOME || '/var/tmp', '.counterstate.json'))
 var envUrl = 'http://172.16.32.64/details.xml';
 var cubeSvr = '127.0.0.1';
 
@@ -33,6 +37,39 @@ function send(result) {
     console.log(result);
 }
 
+state = loadState();
+stateDirty = false;
+saveState();
+
+function saveState() {
+    if (stateDirty) {
+        fs.writeFileSync(stateFile, JSON.stringify(state), 'utf-8');
+        stateDirty = false;
+    }
+
+    setTimeout(saveState, 1000);
+}
+
+function loadState() {
+    try {
+        return JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+    } catch (e) {
+        return {}
+    }
+}
+
+function counterDiff(name, curValue) {
+    var diff;
+    if (state[name] !== undefined) {
+        diff = curValue - state[name];
+    }
+
+    state[name] = curValue;
+    stateDirty = true;
+
+    return diff;
+}
+
 var prevCounter;
 function poll() {
     var stamp = new Date();
@@ -42,17 +79,10 @@ function poll() {
         var m = data.match(/<Counter_A>([0-9.]+)/);
         if (m) {
             var counter = parseInt(m[1], 10);
-            if (!prevCounter) {
-                prevCounter = counter;
-            } else {
-                if (counter !== prevCounter) {
-                    result.data.impulses = counter - prevCounter;
-                    prevCounter = counter;
-                }
-            }
+            result.data.impulses = counterDiff('impulses', counter);
         }
 
-        var m = data.match(/<PrimaryValue>([0-9.]+) Deg C/);
+        var m = data.match(/<PrimaryValue>(-?[0-9.]+) Deg C/);
         if (m) {
             var temp = parseFloat(m[1]).toFixed(1);
             result.data.temperature = +temp;
