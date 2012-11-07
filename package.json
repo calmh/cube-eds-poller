@@ -1,11 +1,11 @@
 {
   "author": "Jakob Borg <jakob@nym.se> (http://nym.se/)",
-  "name": "eds-cube-poller",
+  "name": "cube-eds-poller",
+  "bin": {
+    "eds-poller": "./eds-poller.js"
+  },
   "description": "Fetch environmental data from an EDS 1-Wire device and inject it into Cube",
   "version": "1.0.0",
-  "dependencies": {
-    "iso8601": "~1.1.1"
-  },
   "engines": {
     "node": "*"
   }

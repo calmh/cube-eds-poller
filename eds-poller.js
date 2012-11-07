@@ -1,30 +1,21 @@
-// --- Begin Configuration ---
-
-var edsUrl = 'http://172.16.32.64/details.xml';
-var cubeSvr = '127.0.0.1';
-var extractions = [{
-        exp: /<Counter_A>([0-9.]+)/,
-        name: 'impulses',
-        type: 'counter'
-    }, {
-        exp: /<PrimaryValue>(-?[0-9]+\.[0-9])[0-9]* Deg C/,
-        name: 'temperature',
-        type: 'gauge'
-}];
-
-// --- End of Configuration ---
+#!/usr/bin/env node
 
 var dgram = require('dgram');
 var fs = require('fs');
 var http = require('http');
-var iso8601 = require('iso8601');
 var path = require('path');
+
+var iso8601 = require('./lib/iso8601');
 
 var udp = dgram.createSocket('udp4');
 var stateFile = path.normalize(path.join(process.env.HOME || '/var/tmp', 'counterstate.json'))
 
+var config = loadConfig();
+var state = loadState();
+var stateDirty = false;
+
 function get(cb) {
-    var req = http.get(edsUrl, function (res) {
+    var req = http.get(config.edsUrl, function (res) {
         var data = '';
         res.on('data', function (chunk) { data += chunk; });
         res.on('end', function () { cb(data); });
@@ -46,7 +37,7 @@ function next(ms) {
 
 function send(result) {
     var buffer = new Buffer(JSON.stringify(result));
-    udp.send(buffer, 0, buffer.length, 1180, cubeSvr);
+    udp.send(buffer, 0, buffer.length, config.cubeUdpPort, config.cubeUdpAddr);
     console.log(result);
 }
 
@@ -57,6 +48,10 @@ function saveState() {
     }
 
     setTimeout(saveState, 1000);
+}
+
+function loadConfig() {
+    return JSON.parse(fs.readFileSync(process.argv[2], 'utf-8'));
 }
 
 function loadState() {
@@ -83,7 +78,7 @@ function poll() {
     var stamp = new Date();
     get(function (data) {
         var result = { type: 'reading', time: stamp, data: { } };
-        extractions.forEach(function (ex) {
+        config.extractions.forEach(function (ex) {
             var m = data.match(ex.exp);
             if (m) {
                 var value = +m[1];
@@ -103,8 +98,6 @@ function poll() {
     });
 }
 
-state = loadState();
-stateDirty = false;
-saveState();
 poll();
+saveState();
 
