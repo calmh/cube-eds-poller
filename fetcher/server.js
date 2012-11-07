@@ -1,3 +1,19 @@
+// --- Begin Configuration ---
+
+var edsUrl = 'http://172.16.32.64/details.xml';
+var cubeSvr = '127.0.0.1';
+var extractions = [{
+        exp: /<Counter_A>([0-9.]+)/,
+        name: 'impulses',
+        type: 'counter'
+    }, {
+        exp: /<PrimaryValue>(-?[0-9]+\.[0-9])[0-9]* Deg C/,
+        name: 'temperature',
+        type: 'gauge'
+}];
+
+// --- End of Configuration ---
+
 var dgram = require('dgram');
 var fs = require('fs');
 var http = require('http');
@@ -5,13 +21,10 @@ var iso8601 = require('iso8601');
 var path = require('path');
 
 var udp = dgram.createSocket('udp4');
-
-var stateFile = path.normalize(path.join(process.env.HOME || '/var/tmp', '.counterstate.json'))
-var envUrl = 'http://172.16.32.64/details.xml';
-var cubeSvr = '127.0.0.1';
+var stateFile = path.normalize(path.join(process.env.HOME || '/var/tmp', 'counterstate.json'))
 
 function get(cb) {
-    var req = http.get(envUrl, function (res) {
+    var req = http.get(edsUrl, function (res) {
         var data = '';
         res.on('data', function (chunk) { data += chunk; });
         res.on('end', function () { cb(data); });
@@ -36,10 +49,6 @@ function send(result) {
     udp.send(buffer, 0, buffer.length, 1180, cubeSvr);
     console.log(result);
 }
-
-state = loadState();
-stateDirty = false;
-saveState();
 
 function saveState() {
     if (stateDirty) {
@@ -70,23 +79,21 @@ function counterDiff(name, curValue) {
     return diff;
 }
 
-var prevCounter;
 function poll() {
     var stamp = new Date();
     get(function (data) {
         var result = { type: 'reading', time: stamp, data: { } };
-
-        var m = data.match(/<Counter_A>([0-9.]+)/);
-        if (m) {
-            var counter = parseInt(m[1], 10);
-            result.data.impulses = counterDiff('impulses', counter);
-        }
-
-        var m = data.match(/<PrimaryValue>(-?[0-9.]+) Deg C/);
-        if (m) {
-            var temp = parseFloat(m[1]).toFixed(1);
-            result.data.temperature = +temp;
-        }
+        extractions.forEach(function (ex) {
+            var m = data.match(ex.exp);
+            if (m) {
+                var value = +m[1];
+                if (ex.type == 'counter') {
+                    result.data[ex.name] = counterDiff(ex.name, value);
+                } else {
+                    result.data[ex.name] = value;
+                }
+            }
+        });
 
         if (result.data) {
             send(result);
@@ -96,5 +103,8 @@ function poll() {
     });
 }
 
+state = loadState();
+stateDirty = false;
+saveState();
 poll();
 
